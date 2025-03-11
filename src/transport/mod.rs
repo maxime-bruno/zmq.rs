@@ -2,6 +2,8 @@
 mod ipc;
 #[cfg(feature = "tcp-transport")]
 mod tcp;
+#[cfg(all(feature = "tls-transport", feature = "tokio-runtime"))]
+mod tls;
 
 use crate::codec::FramedIo;
 use crate::endpoint::Endpoint;
@@ -28,6 +30,9 @@ pub(crate) async fn connect(endpoint: &Endpoint) -> ZmqResult<(FramedIo, Endpoin
     match endpoint {
         Endpoint::Tcp(_host, _port) => {
             do_if_enabled!("tcp-transport", tcp::connect(_host, *_port).await)
+        }
+        Endpoint::Tls(_host, _port) => {
+            do_if_enabled!("tls-transport", tls::connect(_host, *_port).await)
         }
         Endpoint::Ipc(_path) => {
             #[cfg(all(feature = "ipc-transport", target_family = "unix"))]
@@ -71,6 +76,10 @@ where
         Endpoint::Tcp(_host, _port) => do_if_enabled!(
             "tcp-transport",
             tcp::begin_accept(_host, _port, _cback).await
+        ),
+        Endpoint::Tls(_host, _port) => do_if_enabled!(
+            "tls-transport",
+            tls::begin_accept(_host, _port, _cback).await
         ),
         Endpoint::Ipc(_path) => {
             #[cfg(all(feature = "ipc-transport", target_family = "unix"))]

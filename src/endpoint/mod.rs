@@ -37,6 +37,7 @@ pub enum Endpoint {
     // TODO: Add endpoints for the other transport variants
     Tcp(Host, Port),
     Ipc(Option<PathBuf>),
+    Tls(Host, Port),
 }
 
 impl Endpoint {
@@ -44,6 +45,7 @@ impl Endpoint {
         match self {
             Self::Tcp(_, _) => Transport::Tcp,
             Self::Ipc(_) => Transport::Ipc,
+            Self::Tls(_, _) => Transport::Tls,
         }
     }
 
@@ -54,6 +56,14 @@ impl Endpoint {
 
     pub fn from_tcp_domain(addr: String, port: u16) -> Self {
         Endpoint::Tcp(Host::Domain(addr), port)
+    }
+
+    pub fn from_tls_addr(addr: SocketAddr) -> Self {
+        Endpoint::Tls(addr.ip().into(), addr.port())
+    }
+
+    pub fn from_tls_domain(addr: String, port: u16) -> Self {
+        Endpoint::Tls(Host::Domain(addr), port)
     }
 }
 
@@ -91,6 +101,10 @@ impl FromStr for Endpoint {
                 let path: PathBuf = address.to_string().into();
                 Endpoint::Ipc(Some(path))
             }
+            Transport::Tls => {
+                let (host, port) = extract_host_port(address)?;
+                Endpoint::Tls(host, port)
+            }
         };
 
         Ok(endpoint)
@@ -105,6 +119,13 @@ impl fmt::Display for Endpoint {
                     write!(f, "tcp://[{}]:{}", host, port)
                 } else {
                     write!(f, "tcp://{}:{}", host, port)
+                }
+            }
+            Endpoint::Tls(host, port) => {
+                if let Host::Ipv6(_) = host {
+                    write!(f, "tls://[{}]:{}", host, port)
+                } else {
+                    write!(f, "tls://{}:{}", host, port)
                 }
             }
             Endpoint::Ipc(Some(path)) => write!(f, "ipc://{}", path.display()),
@@ -194,6 +215,38 @@ mod tests {
                 Endpoint::Tcp(Host::Ipv4("127.0.0.1".parse().unwrap()), 0),
                 "tcp://127.0.0.1:0",
             ),
+            (
+                Endpoint::Tls(Host::Domain("www.example.com".to_string()), 1234),
+                "tls://www.example.com:1234",
+            ),
+            (
+                Endpoint::Tls(Host::Domain("*".to_string()), 2345),
+                "tls://*:2345",
+            ),
+            (
+                Endpoint::Tls(Host::Ipv4("127.0.0.1".parse().unwrap()), 8080),
+                "tls://127.0.0.1:8080",
+            ),
+            (
+                Endpoint::Tls(Host::Ipv6("::1".parse().unwrap()), 34567),
+                "tls://[::1]:34567",
+            ),
+            (
+                Endpoint::Tls(Host::Domain("i❤.ws".to_string()), 80),
+                "tls://i❤.ws:80",
+            ),
+            (
+                Endpoint::Tls(Host::Domain("xn--i-7iq.ws".to_string()), 80),
+                "tls://xn--i-7iq.ws:80",
+            ),
+            (
+                Endpoint::Tls(Host::Ipv4("127.0.0.1".parse().unwrap()), 65535),
+                "tls://127.0.0.1:65535",
+            ),
+            (
+                Endpoint::Tls(Host::Ipv4("127.0.0.1".parse().unwrap()), 0),
+                "tls://127.0.0.1:0",
+            ),
         ]
     });
 
@@ -234,6 +287,11 @@ mod tests {
             ("tcp://127.0.0.1", EndpointError::Syntax("")),
             ("tcp://127.0.0.1:65536", EndpointError::Syntax("")),
             ("TCP://127.0.0.1:1234", EndpointError::Syntax("")),
+            ("tls://127.0.0.1:", EndpointError::Syntax("")),
+            ("tls://:1234", EndpointError::Syntax("")),
+            ("tls://127.0.0.1", EndpointError::Syntax("")),
+            ("tls://127.0.0.1:65536", EndpointError::Syntax("")),
+            ("TLS://127.0.0.1:1234", EndpointError::Syntax("")),
         ];
 
         for (s, target_variant) in inexact_counter_examples {

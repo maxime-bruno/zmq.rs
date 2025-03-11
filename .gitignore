@@ -4,3 +4,4 @@ Cargo.lock
 .venv
 .idea
 *.iml
+certs

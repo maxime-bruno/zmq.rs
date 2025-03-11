@@ -21,6 +21,7 @@ async-dispatcher-macros = ["async-dispatcher/macros"]
 all-transport = ["ipc-transport", "tcp-transport"]
 ipc-transport = []
 tcp-transport = []
+tls-transport = ["tokio-runtime", "tokio-rustls", "cert-manager"]
 
 [dependencies]
 async-dispatcher = { version = "0.1", optional = true }
@@ -32,6 +33,7 @@ rand = "0.8"
 bytes = "1"
 tokio = { version = "1", features = ["full"], optional = true }
 tokio-util = { version = "0.7", features = ["compat"], optional = true }
+tokio-rustls = { version = "0.26", optional = true }
 num-traits = "0.2"
 dashmap = "5"
 crossbeam-queue = "0.3"
@@ -44,6 +46,7 @@ once_cell = "1"
 log = "0.4"
 asynchronous-codec = "0.7"
 async-std = { version = "1", features = ["attributes"], optional = true }
+cert-manager = { path = "../network-experiment/cert-manager", optional = true }
 
 [dev-dependencies]
 async-dispatcher = { version = "0.1", features = ["macros"] }
