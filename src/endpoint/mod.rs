@@ -38,6 +38,7 @@ pub enum Endpoint {
     Tcp(Host, Port),
     Ipc(Option<PathBuf>),
     Tls(Host, Port),
+    Quic(Host, Port),
 }
 
 impl Endpoint {
@@ -46,6 +47,7 @@ impl Endpoint {
             Self::Tcp(_, _) => Transport::Tcp,
             Self::Ipc(_) => Transport::Ipc,
             Self::Tls(_, _) => Transport::Tls,
+            Self::Quic(_, _) => Transport::Quic,
         }
     }
 
@@ -64,6 +66,14 @@ impl Endpoint {
 
     pub fn from_tls_domain(addr: String, port: u16) -> Self {
         Endpoint::Tls(Host::Domain(addr), port)
+    }
+
+    pub fn from_quic_addr(addr: SocketAddr) -> Self {
+        Endpoint::Quic(addr.ip().into(), addr.port())
+    }
+
+    pub fn from_quic_domain(addr: String, port: u16) -> Self {
+        Endpoint::Quic(Host::Domain(addr), port)
     }
 }
 
@@ -105,6 +115,10 @@ impl FromStr for Endpoint {
                 let (host, port) = extract_host_port(address)?;
                 Endpoint::Tls(host, port)
             }
+            Transport::Quic => {
+                let (host, port) = extract_host_port(address)?;
+                Endpoint::Quic(host, port)
+            }
         };
 
         Ok(endpoint)
@@ -126,6 +140,13 @@ impl fmt::Display for Endpoint {
                     write!(f, "tls://[{}]:{}", host, port)
                 } else {
                     write!(f, "tls://{}:{}", host, port)
+                }
+            }
+            Endpoint::Quic(host, port) => {
+                if let Host::Ipv6(_) = host {
+                    write!(f, "quic://[{}]:{}", host, port)
+                } else {
+                    write!(f, "quic://{}:{}", host, port)
                 }
             }
             Endpoint::Ipc(Some(path)) => write!(f, "ipc://{}", path.display()),

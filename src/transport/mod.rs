@@ -1,5 +1,7 @@
 #[cfg(all(feature = "ipc-transport", target_family = "unix"))]
 mod ipc;
+#[cfg(all(feature = "quic-transport", feature = "tokio-runtime"))]
+mod quic;
 #[cfg(feature = "tcp-transport")]
 mod tcp;
 #[cfg(all(feature = "tls-transport", feature = "tokio-runtime"))]
@@ -33,6 +35,9 @@ pub(crate) async fn connect(endpoint: &Endpoint) -> ZmqResult<(FramedIo, Endpoin
         }
         Endpoint::Tls(_host, _port) => {
             do_if_enabled!("tls-transport", tls::connect(_host, *_port).await)
+        }
+        Endpoint::Quic(_host, _port) => {
+            do_if_enabled!("quic-transport", quic::connect(_host, *_port).await)
         }
         Endpoint::Ipc(_path) => {
             #[cfg(all(feature = "ipc-transport", target_family = "unix"))]
@@ -81,6 +86,10 @@ where
             "tls-transport",
             tls::begin_accept(_host, _port, _cback).await
         ),
+        Endpoint::Quic(_host, _port) => do_if_enabled!(
+            "quic-transport",
+            quic::begin_accept(_host, _port, _cback).await
+        ),
         Endpoint::Ipc(_path) => {
             #[cfg(all(feature = "ipc-transport", target_family = "unix"))]
             {
@@ -118,4 +127,55 @@ where
     use futures::AsyncReadExt;
     let (read, write) = stream.split();
     FramedIo::new(Box::new(read), Box::new(write))
+}
+
+#[cfg(any(feature = "quic-transport", feature = "tls-transport"))]
+static CERT_FOLDER: CertFolder = CertFolder::new();
+
+#[cfg(any(feature = "quic-transport", feature = "tls-transport"))]
+pub(crate) fn set_cert_folder<P: AsRef<std::path::Path>>(
+    folder: P,
+) -> Result<(), std::path::PathBuf> {
+    CERT_FOLDER.init(folder)
+}
+
+#[cfg(any(feature = "quic-transport", feature = "tls-transport"))]
+struct CertFolder {
+    folder: std::sync::OnceLock<std::path::PathBuf>,
+}
+#[cfg(any(feature = "quic-transport", feature = "tls-transport"))]
+impl CertFolder {
+    pub const fn new() -> Self {
+        Self {
+            folder: std::sync::OnceLock::new(),
+        }
+    }
+
+    fn init_ca<P: AsRef<std::path::Path>>(folder: P) -> std::path::PathBuf {
+        match cert_manager::CertManager::from_folder(&folder) {
+            Err(cert_manager::Error::IoError(error)) => {
+                log::warn!(
+                    "Error while opening the cert folder ({}):{error}",
+                    folder.as_ref().display()
+                );
+                cert_manager::CertManager::new_in(&folder).unwrap();
+            }
+            Err(e) => panic!("{}", e),
+            Ok(_) => (),
+        }
+        let folder = folder.as_ref();
+        folder.to_path_buf()
+    }
+
+    pub fn init<P: AsRef<std::path::Path>>(&self, folder: P) -> Result<(), std::path::PathBuf> {
+        self.folder.set(Self::init_ca(folder))
+    }
+}
+#[cfg(any(feature = "quic-transport", feature = "tls-transport"))]
+impl std::ops::Deref for CertFolder {
+    type Target = std::path::PathBuf;
+
+    fn deref(&self) -> &Self::Target {
+        self.folder.get_or_init(|| Self::init_ca("examples/certs"))
+    }
 }

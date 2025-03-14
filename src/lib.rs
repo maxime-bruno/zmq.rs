@@ -384,3 +384,10 @@ pub mod prelude {
 
     pub use crate::{Socket, SocketRecv, SocketSend, TryIntoEndpoint};
 }
+
+#[cfg(any(feature = "quic-transport", feature = "tls-transport"))]
+pub fn set_certificate_folder<P: AsRef<std::path::Path>>(
+    folder: P,
+) -> Result<(), std::path::PathBuf> {
+    transport::set_cert_folder(folder)
+}

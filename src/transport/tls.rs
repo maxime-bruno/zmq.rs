@@ -7,8 +7,8 @@ use std::sync::Arc;
 // #[cfg(any(feature = "async-std-runtime", feature = "async-dispatcher-runtime"))]
 // use async_std::net::{TcpListener, TcpStream};
 
-use super::make_framed;
 use super::AcceptStopHandle;
+use super::{make_framed, CERT_FOLDER};
 use crate::async_rt;
 use crate::codec::FramedIo;
 use crate::endpoint::{Endpoint, Host, Port};
@@ -25,7 +25,7 @@ pub(crate) async fn connect(host: &Host, port: Port) -> ZmqResult<(FramedIo, End
     raw_socket.set_nodelay(true)?;
     let peer_addr = raw_socket.peer_addr()?;
 
-    let cert_manager = cert_manager::CertManager::from_folder("certs").unwrap();
+    let cert_manager = cert_manager::CertManager::from_folder(&*CERT_FOLDER).unwrap();
     let ca = cert_manager.get_root_cert_store().unwrap();
 
     let config = ClientConfig::builder()
@@ -99,7 +99,7 @@ async fn accept(
     remote_addr: std::net::SocketAddr,
     host: &Host,
 ) -> (FramedIo, Endpoint) {
-    let mut cert_manager = cert_manager::CertManager::from_folder("certs").unwrap();
+    let mut cert_manager = cert_manager::CertManager::from_folder(&*CERT_FOLDER).unwrap();
     let (certs, key) = cert_manager
         .create_certificate_or_get(host.to_string().as_str())
         .unwrap();

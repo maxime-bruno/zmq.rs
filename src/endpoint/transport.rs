@@ -12,6 +12,7 @@ pub enum Transport {
     Tcp,
     Ipc,
     Tls,
+    Quic,
 }
 
 impl Transport {
@@ -20,6 +21,7 @@ impl Transport {
             Transport::Tcp => "tcp",
             Transport::Ipc => "ipc",
             Transport::Tls => "tls",
+            Transport::Quic => "quic",
         }
     }
 }
@@ -32,6 +34,7 @@ impl FromStr for Transport {
             "tcp" => Transport::Tcp,
             "ipc" => Transport::Ipc,
             "tls" => Transport::Tls,
+            "quic" => Transport::Quic,
             _ => return Err(EndpointError::UnknownTransport(s.to_string())),
         };
         Ok(result)
